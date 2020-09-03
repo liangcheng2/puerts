@@ -108,4 +108,8 @@ var global = global || (function () { return this; }());
     }
     
     puerts.blueprint = blueprint;
+
+    puerts.dumpStatisticsLog = global.dumpStatisticsLog
+    puerts.gc = global.testgc
+
 }(global));

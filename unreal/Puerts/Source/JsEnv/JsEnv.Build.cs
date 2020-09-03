@@ -54,6 +54,13 @@ public class JsEnv : ModuleRules
         {
             string ARMv7aLibPath = Path.Combine(LibraryPath, "V8", "Android", "armv7a-release");
             string ARM64LibPath = Path.Combine(LibraryPath, "V8", "Android", "arm64-release");
+            
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libinspector.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_base.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libbase.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libplatform.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libsampler.a"));
+            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_external_snapshot.a"));
 
             PublicAdditionalLibraries.Add(Path.Combine(ARMv7aLibPath, "libinspector.a"));
             PublicAdditionalLibraries.Add(Path.Combine(ARMv7aLibPath, "libv8_base.a"));
@@ -61,13 +68,6 @@ public class JsEnv : ModuleRules
             PublicAdditionalLibraries.Add(Path.Combine(ARMv7aLibPath, "libv8_libplatform.a"));
             PublicAdditionalLibraries.Add(Path.Combine(ARMv7aLibPath, "libv8_libsampler.a"));
             PublicAdditionalLibraries.Add(Path.Combine(ARMv7aLibPath, "libv8_external_snapshot.a"));
-
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libinspector.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_base.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libbase.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libplatform.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_libsampler.a"));
-            PublicAdditionalLibraries.Add(Path.Combine(ARM64LibPath, "libv8_external_snapshot.a"));
 
             // TODO - 开启Websockets库依赖
             /*

@@ -174,7 +174,7 @@ void FTypeScriptDeclarationGenerator::GenTypeScriptDeclaration()
     }
     End();
 
-    FFileHelper::SaveStringToFile(ToString(), *(FPaths::ProjectContentDir() / TEXT("Typing/ue/ue.d.ts")));
+    FFileHelper::SaveStringToFile(ToString(), *(FPaths::ProjectContentDir() / TEXT("TsScripts/typing/ue/ue.d.ts")));
 }
 
 void FTypeScriptDeclarationGenerator::Gen(UObject *ToGen)
@@ -652,8 +652,8 @@ interface TReactUMG {
 export var ReactUMG : TReactUMG;
 )";
 
-    FFileHelper::SaveStringToFile(ToString(), *(FPaths::ProjectContentDir() / TEXT("TypeScript/react-umg/index.d.ts")));
-    FFileHelper::SaveStringToFile(Components, *(FPaths::ProjectContentDir() / TEXT("JavaScript/react-umg/components.js")));
+    FFileHelper::SaveStringToFile(ToString(), *(FPaths::ProjectContentDir() / TEXT("TsScripts/typing/react-umg/index.d.ts")));
+    FFileHelper::SaveStringToFile(Components, *(FPaths::ProjectContentDir() / TEXT("TsScripts/dist/react-umg/components.js")));
 }
 
 static bool IsReactSupportProperty(PropertyMacro *Property) 
