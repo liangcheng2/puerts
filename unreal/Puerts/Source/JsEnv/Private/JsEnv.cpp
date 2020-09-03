@@ -26,7 +26,7 @@
 #include "JSGeneratedFunction.h"
 #include "JSClassRegister.h"
 
-#pragma warning(push, 0)  
+#pragma warning(push, 0)
 #include "libplatform/libplatform.h"
 #include "v8.h"
 #pragma warning(pop)
@@ -268,7 +268,7 @@ private:
         }
     };
 
-        
+
     friend ObjectMerger;
 
 private:
@@ -712,7 +712,7 @@ FJsEnvImpl::~FJsEnvImpl()
         delete Inspector;
         Inspector = nullptr;
     }
-        
+
     DynamicInvoker->Parent = nullptr;
     DynamicInvoker.Reset();
 
@@ -1188,7 +1188,7 @@ bool FJsEnvImpl::AddToDelegate(v8::Isolate* Isolate, v8::Local<v8::Context>& Con
         DelegateProxy->SignatureFunction = Iter->second.SignatureFunction;
         DelegateProxy->DynamicInvoker = DynamicInvoker;
         DelegateProxy->JsFunction = v8::UniquePersistent<v8::Function>(Isolate, JsFunction);
-            
+
         SysObjectRetainer.Retain(DelegateProxy);
         auto ReturnVal = Map->Set(Context, JsFunction, v8::External::New(Context->GetIsolate(), DelegateProxy));
     }
@@ -1252,7 +1252,7 @@ bool FJsEnvImpl::RemoveFromDelegate(v8::Isolate* Isolate, v8::Local<v8::Context>
         Delegate.BindUFunction(DelegateProxy, NAME_Fire);
 
         static_cast<FMulticastScriptDelegate*>(DelegatePtr)->Remove(Delegate);
-            
+
         auto ReturnVal = Map->Set(Context, JsFunction, v8::Undefined(Isolate));
 
         Iter->second.Proxys.Remove(DelegateProxy);
@@ -1391,7 +1391,7 @@ void FJsEnvImpl::BindStruct(UScriptStruct* ScriptStruct, void *Ptr, v8::Local<v8
 {
     FV8Utils::SetPointer(MainIsolate, JSObject, Ptr, 0);
     FV8Utils::SetPointer(MainIsolate, JSObject, ScriptStruct, 1);// add type info
-        
+
     if (!PassByPointer)
     {
         StructMap[Ptr] = v8::UniquePersistent<v8::Value>(MainIsolate, JSObject);
@@ -1499,7 +1499,7 @@ v8::Local<v8::FunctionTemplate> FJsEnvImpl::GetTemplateOfClass(UStruct *InStruct
                 Template->Inherit(GetTemplateOfClass(SuperClass));
             }
         }
-            
+
         ClassToTemplateMap[InStruct] = v8::UniquePersistent<v8::FunctionTemplate>(Isolate, Template);
 
         return HandleScope.Escape(Template);
@@ -1941,7 +1941,7 @@ void FJsEnvImpl::Log(const v8::FunctionCallbackInfo<v8::Value>& Info)
     v8::Context::Scope ContextScope(Context);
 
     CHECK_V8_ARGS(Int32, String);
-        
+
     auto Level = Info[0]->Int32Value(Context).ToChecked();
 
     FString Msg = FV8Utils::ToFString(Isolate, Info[1]);
@@ -1979,7 +1979,7 @@ void FJsEnvImpl::LoadModule(const v8::FunctionCallbackInfo<v8::Value>& Info)
     FString OutDebugPath;
     TArray<uint8> Data;
     try
-    { 
+    {
         LoadFile(RequiringDir, ModuleName, OutPath, OutDebugPath, Data);
     }
     catch (const JSError& Err)
@@ -2072,7 +2072,7 @@ void FJsEnvImpl::ClearInterval(const v8::FunctionCallbackInfo<v8::Value>& Info)
     v8::HandleScope HandleScope(Isolate);
     v8::Local<v8::Context> Context = Isolate->GetCurrentContext();
     v8::Context::Scope ContextScope(Context);
-        
+
     // todo - mocha 7.0.1，当reporter为JSON，调用clearTimeout时，可能不传值，或传Null、Undefined过来。暂将其忽略
     if (Info.Length() == 0)
     {
@@ -2161,7 +2161,7 @@ void FJsEnvImpl::RequestJitModuleMethod(const v8::FunctionCallbackInfo<v8::Value
                 Args[0] = v8::Undefined(MainIsolate);
             }
             Args[1] = FV8Utils::ToV8String(MainIsolate, Rpy);
-                
+
             auto ReturnVal = Callback->Call(Context1, v8::Undefined(MainIsolate), 2, Args);
         });
     });
