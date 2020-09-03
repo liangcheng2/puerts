@@ -418,10 +418,19 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
     v8::V8::SetFlagsFromString(Flags.c_str(), static_cast<int>(Flags.size()));
 #endif
 
-#if PLATFORM_ANDROID
-    std::string Flags = "--trace-gc-object-stats";
-    v8::V8::SetFlagsFromString(Flags.c_str(), static_cast<int>(Flags.size()));
-#endif
+//#if PLATFORM_ANDROID
+//    std::string Flags = "--trace-gc-object-stats";
+//    v8::V8::SetFlagsFromString(Flags.c_str(), static_cast<int>(Flags.size()));
+//#endif
+
+    //std::string GCFlag = "--expose-gc --jitless";
+    std::string GCFlag = "--expose-gc";
+    if (FParse::Param(FCommandLine::Get(), TEXT("--jitless")))
+    {
+        GCFlag += " --jitless";
+        UE_LOG(LogTemp, Error, TEXT("enable jitless"));
+    }
+    v8::V8::SetFlagsFromString(GCFlag.c_str(), static_cast<int>(GCFlag.size()));
 
     Started = false;
     Inspector = nullptr;
@@ -574,6 +583,12 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
         Self->DumpStatisticsLog(Info);
     }, This)->GetFunction(Context).ToLocalChecked()).Check();
 
+    Global->Set(Context, FV8Utils::ToV8String(Isolate, "testgc"), v8::FunctionTemplate::New(Isolate, [](const v8::FunctionCallbackInfo<v8::Value>& Info)
+    {
+        auto Self = reinterpret_cast<FJsEnvImpl*>((v8::Local<v8::External>::Cast(Info.Data()))->Value());
+        Self->MainIsolate->RequestGarbageCollectionForTesting(v8::Isolate::GarbageCollectionType::kFullGarbageCollection);
+    }, This)->GetFunction(Context).ToLocalChecked()).Check();
+
     ArrayTemplate = v8::UniquePersistent<v8::FunctionTemplate>(Isolate, FScriptArrayWrapper::ToFunctionTemplate(Isolate));
 
     SetTemplate = v8::UniquePersistent<v8::FunctionTemplate>(Isolate, FScriptSetWrapper::ToFunctionTemplate(Isolate));
@@ -595,13 +610,19 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
 
     InitExtensionMethodsMap();
 
-    ExecuteModule("puerts/first_run.js");
-    ExecuteModule("puerts/polyfill.js");
-    ExecuteModule("puerts/log.js");
-    ExecuteModule("puerts/modular.js");
-    ExecuteModule("puerts/uelazyload.js");
-    ExecuteModule("puerts/argv.js");
-    ExecuteModule("puerts/jit_stub.js");
+    const FString DefaultJSs[] = {
+        "puerts/first_run.js",
+        "puerts/polyfill.js",
+        "puerts/log.js",
+        "puerts/modular.js",
+        "puerts/uelazyload.js",
+        "puerts/argv.js",
+        "puerts/jit_stub.js",
+    };
+    for (auto& Path : DefaultJSs)
+    {
+        ExecuteModule(FString::Printf(TEXT("%s/Puerts/Content/JavaScript/%s"), *FPaths::ProjectPluginsDir(), *Path));
+    }
 
     DelegateProxysCheckerHandler = FTicker::GetCoreTicker().AddTicker(TBaseDelegate<bool, float>::CreateRaw(this, &FJsEnvImpl::CheckDelegateProxys), 1);
 }
