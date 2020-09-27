@@ -292,34 +292,58 @@ public class JsEnv : ModuleRules
 
         bEnableExceptions = true;
         bEnableUndefinedIdentifierWarnings = false; // 避免在VS 2017编译时出现C4668错误
+        bool UseMonolith = Target.LinkType == TargetLinkType.Monolithic;
+        PublicDefinitions.Add("V8_COMPRESS_POINTERS");
 
         string LibraryPath = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "ThirdParty", "Library"));
         if (Target.Platform == UnrealTargetPlatform.Win64)
         {
             string V8LibraryPath = Path.Combine(LibraryPath, "V8", "Win64");
-            
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "encoding.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "inspector.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "inspector_string_conversions.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_base_without_compiler_0.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_base_without_compiler_1.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_compiler.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_external_snapshot.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libbase.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libplatform.lib"));
-            PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libsampler.lib"));
-
-            /*
-            if (Target.bBuildEditor)
+            if (UseMonolith)
             {
-                string WSLibraryPath = Path.Combine(LibraryPath, "Websockets", "Win64");
-
-                PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "websockets_static.lib"));
-                PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "libssl_static.lib"));
-                PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "libcrypto_static.lib"));
-                PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "zlib_internal.lib"));
+                PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_monolith.lib"));
             }
-            */
+            else
+            {
+                PublicRuntimeLibraryPaths.Add(V8LibraryPath);
+                System.Action<string> AddLib = (string Name)=> {
+                    string DllName = Name + ".dll";
+                    string LibName = DllName + ".lib";
+                    string DllFullPath = Path.Combine(V8LibraryPath, DllName);
+                    string LibFullName = Path.Combine(V8LibraryPath, LibName);
+
+                    PublicAdditionalLibraries.Add(LibFullName);
+                    PublicDelayLoadDLLs.Add(DllFullPath);
+                    RuntimeDependencies.Add(Path.Combine("$(TargetOutputDir)", DllName), DllFullPath);
+                };
+
+                AddLib("v8");
+                AddLib("v8_libplatform");
+
+                ////PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "encoding.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "inspector.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "inspector_string_conversions.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_base_without_compiler_0.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_base_without_compiler_1.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_compiler.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_snapshot.lib"));
+                ////PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_external_snapshot.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libbase.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libplatform.lib"));
+                //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "v8_libsampler.lib"));
+
+                /*
+                if (Target.bBuildEditor)
+                {
+                    string WSLibraryPath = Path.Combine(LibraryPath, "Websockets", "Win64");
+
+                    PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "websockets_static.lib"));
+                    PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "libssl_static.lib"));
+                    PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "libcrypto_static.lib"));
+                    PublicAdditionalLibraries.Add(Path.Combine(WSLibraryPath, "zlib_internal.lib"));
+                }
+                */
+            }
         }
         else if (Target.Platform == UnrealTargetPlatform.Android)
         {
@@ -336,8 +360,10 @@ public class JsEnv : ModuleRules
                 }
                 if (bBuildForArm64)
                 {
-                    string V8LibraryPath = Path.Combine(LibraryPath, "V8", "Android", "arm64-release", "8.4.371.19");
-                    PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "libwee8.a"));
+                    //string V8LibraryPath = Path.Combine(LibraryPath, "V8", "Android", "arm64-release", "8.4.371.19");
+                    //PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "libwee8.a"));
+                    string V8LibraryPath = Path.Combine(LibraryPath, "V8", "Android", "arm64-release", "8.5.210.20");
+                    PublicAdditionalLibraries.Add(Path.Combine(V8LibraryPath, "libv8_monolith.a"));
                 }
             }
             else if (Target.Version.MajorVersion == 4 && Target.Version.MinorVersion < 25)
@@ -408,7 +434,7 @@ public class JsEnv : ModuleRules
         }
         string coreJSPath = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "Content"));
         string destDirName = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "..", "..", "Content"));
-        DirectoryCopy(coreJSPath, destDirName, true);
+        //DirectoryCopy(coreJSPath, destDirName, true);
 
         string HeaderPath = Path.GetFullPath(Path.Combine(ModuleDirectory, "..", "..", "ThirdParty", "Include"));
         // External headers
@@ -416,7 +442,8 @@ public class JsEnv : ModuleRules
         {
             if (Target.Version.MajorVersion == 4 && Target.Version.MinorVersion == 25)
             {
-                PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "8.4.371.19") });
+                //PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "8.4.371.19") });
+                PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "8.5.210.20") });
             }
             else if (Target.Version.MajorVersion == 4 && Target.Version.MinorVersion < 25)
             {
@@ -429,7 +456,8 @@ public class JsEnv : ModuleRules
             Target.Platform == UnrealTargetPlatform.IOS ||
             Target.Platform == UnrealTargetPlatform.Mac)
         {
-            PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "7.7.299") });
+            //PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "7.7.299") });
+            PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "v8", "8.5.210.20") });
             PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "websocketpp") });
             PublicIncludePaths.AddRange(new string[] { Path.Combine(HeaderPath, "asio") });
         }

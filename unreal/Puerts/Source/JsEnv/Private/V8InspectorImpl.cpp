@@ -11,6 +11,10 @@
 #define USING_UE 0
 #endif
 
+#if PLATFORM_WINDOWS || PLATFORM_MAC
+#include "V8InspectorImpl.h"
+#endif
+
 #if !USING_UE
 #if !defined(PLATFORM_WINDOWS) || defined(PLATFORM_MAC)
 #if defined(_WIN32)
@@ -33,7 +37,7 @@
 
 #if PLATFORM_WINDOWS || PLATFORM_MAC
 
-#include "V8InspectorImpl.h"
+//#include "V8InspectorImpl.h"
 
 #include <functional>
 #include <string> 

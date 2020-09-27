@@ -139,7 +139,7 @@ V8JSEnv::V8JSEnv(): Inspector(nullptr)
         NativesBlob->data = (const char *)NativesBlobCode;
         NativesBlob->raw_size = sizeof(NativesBlobCode);
     }
-    v8::V8::SetNativesDataBlob(NativesBlob.get());
+    //v8::V8::SetNativesDataBlob(NativesBlob.get());
 #endif
     std::shared_ptr<v8::StartupData> SnapshotBlob;
     if (!SnapshotBlob)
@@ -150,7 +150,8 @@ V8JSEnv::V8JSEnv(): Inspector(nullptr)
     }
 
     // 初始化Isolate和DefaultContext
-    v8::V8::SetSnapshotDataBlob(SnapshotBlob.get());
+    //v8::V8::SetNativesDataBlob(NativesBlob.get());
+    //v8::V8::SetSnapshotDataBlob(SnapshotBlob.get());
 
     CreateParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
     DefaultIsolate = v8::Isolate::New(CreateParams);

@@ -57,6 +57,8 @@
 #include "Blob/iOS/arm64/SnapshotBlob.h"
 #endif
 
+DEFINE_LOG_CATEGORY_STATIC(LogJS, Log, All);
+
 namespace puerts
 {
 
@@ -420,6 +422,8 @@ FJsEnvImpl::FJsEnvImpl(const FString &ScriptRoot):FJsEnvImpl(std::make_unique<De
 
 FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::shared_ptr<ILogger> InLogger, int InDebugPort)
 {
+    UE_LOG(LogJS, Error, TEXT("Start v8"));
+
     GUObjectArray.AddUObjectDeleteListener(static_cast<FUObjectArray::FUObjectDeleteListener*>(this));
 
 #if PLATFORM_IOS
@@ -434,10 +438,10 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
 
     //std::string GCFlag = "--expose-gc --jitless";
     std::string GCFlag = "--expose-gc";
-    if (FParse::Param(FCommandLine::Get(), TEXT("--jitless")))
+    if (FString(FCommandLine::Get()).Find(TEXT("jitless")) >= 0)
     {
         GCFlag += " --jitless";
-        UE_LOG(LogTemp, Error, TEXT("enable jitless"));
+        UE_LOG(LogJS, Error, TEXT("enable jitless"));
     }
     v8::V8::SetFlagsFromString(GCFlag.c_str(), static_cast<int>(GCFlag.size()));
 
@@ -455,7 +459,7 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
         NativesBlob->data = (const char *)NativesBlobCode;
         NativesBlob->raw_size = sizeof(NativesBlobCode);
     }
-    v8::V8::SetNativesDataBlob(NativesBlob.get());
+    //v8::V8::SetNativesDataBlob(NativesBlob.get());
 #endif
     std::unique_ptr<v8::StartupData> SnapshotBlob;
     if (!SnapshotBlob)
@@ -466,10 +470,34 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
     }
 
     // 初始化Isolate和DefaultContext
-    v8::V8::SetSnapshotDataBlob(SnapshotBlob.get());
+    //v8::V8::SetNativesDataBlob(NativesBlob.get());
+    //v8::V8::SetSnapshotDataBlob(SnapshotBlob.get());
+    v8::V8::SetDcheckErrorHandler([](const char* file, int line, const char* message) {
+        UE_LOG(LogJS, Error, TEXT("DcheckErrorCallback: file: %s, line: %d, message: %s"), ANSI_TO_TCHAR(file), line, ANSI_TO_TCHAR(message));
+    });
 
     CreateParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
-    MainIsolate = v8::Isolate::New(CreateParams);
+    //MainIsolate = v8::Isolate::New(CreateParams);
+    MainIsolate = v8::Isolate::Allocate();
+
+    MainIsolate->SetFatalErrorHandler([](const char* location, const char* message) {
+        UE_LOG(LogJS, Error, TEXT("FatalErrorCallback: location: %s, message: %s"), ANSI_TO_TCHAR(location), ANSI_TO_TCHAR(message));
+    });
+    MainIsolate->SetOOMErrorHandler([](const char* location, bool is_heap_oom) {
+        UE_LOG(LogJS, Error, TEXT("OOMErrorCallback: location: %s, is_heap_oom: %d"), ANSI_TO_TCHAR(location), is_heap_oom?1:0);
+    });
+
+    v8::Isolate::Initialize(MainIsolate, CreateParams);
+
+    //MainIsolate->AddMessageListener([MainIsolate](v8::Local<v8::Message> message, v8::Local<v8::Value> data) {
+    //    UE_LOG(LogJS, Error, TEXT("MessageCallback: message: %s, data: %s"),
+    //        UTF8_TO_TCHAR(*(v8::String::Utf8Value(MainIsolate, message->Get()))),
+    //        UTF8_TO_TCHAR(*(v8::String::Utf8Value(MainIsolate, data->ToDetailString(nullptr)))));
+    //});
+    // MainIsolate->SetEventLogger([](const char* name, int Event) {
+    //     UE_LOG(LogJS, Log, TEXT("LogEventCallback: name: %s, event: %d"), ANSI_TO_TCHAR(name), Event);
+    // });
+
     auto Isolate = MainIsolate;
     Isolate->SetData(0, static_cast<IObjectMapper*>(this));//直接传this会有问题，强转后地址会变
 
@@ -628,7 +656,11 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
     };
     for (auto& Path : DefaultJSs)
     {
-        ExecuteModule(FString::Printf(TEXT("%s/Puerts/Content/JavaScript/%s"), *FPaths::ProjectPluginsDir(), *Path));
+#if !PLATFORM_ANDROID
+    ExecuteModule(FString::Printf(TEXT("%sPuerts/Content/JavaScript/%s"), *FPaths::ProjectPluginsDir(), *Path));
+#else
+    ExecuteModule(FString::Printf(TEXT("%sGameDataGenerated/ts/JavaScript/%s"), *FPaths::ProjectContentDir(), *Path));
+#endif
     }
 
     DelegateProxysCheckerHandler = FTicker::GetCoreTicker().AddTicker(TBaseDelegate<bool, float>::CreateRaw(this, &FJsEnvImpl::CheckDelegateProxys), 1);
