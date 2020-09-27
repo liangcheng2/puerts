@@ -26,11 +26,11 @@
 #include "Blob/Win64/NativesBlob.h"
 #include "Blob/Win64/SnapshotBlob.h"
 #elif defined(PLATFORM_ANDROID_ARM)
-#include "Blob/Android/armv7a/NativesBlob.h"
-#include "Blob/Android/armv7a/SnapshotBlob.h"
+#include "Blob/Android/armv7a/7.4.288/NativesBlob.h"
+#include "Blob/Android/armv7a/7.4.288/SnapshotBlob.h"
 #elif defined(PLATFORM_ANDROID_ARM64)
-#include "Blob/Android/arm64/NativesBlob.h"
-#include "Blob/Android/arm64/SnapshotBlob.h"
+#include "Blob/Android/arm64/7.4.288/NativesBlob.h"
+#include "Blob/Android/arm64/7.4.288/SnapshotBlob.h"
 #elif defined(PLATFORM_MAC)
 #include "Blob/macOS/NativesBlob.h"
 #include "Blob/macOS/SnapshotBlob.h"
@@ -80,6 +80,8 @@ struct FIndexedInfo
 
 static std::unique_ptr<v8::Platform> GPlatform;
 
+v8::Local<v8::ArrayBuffer> NewArrayBuffer(v8::Isolate* Isolate, void *Ptr, size_t Size, bool Copy);
+
 class JSEngine
 {
 public:
@@ -95,7 +97,7 @@ public:
 
     bool RegisterFunction(int ClassID, const char *Name, bool IsStatic, CSharpFunctionCallback Callback, int64_t Data);
 
-    bool RegisterProperty(int ClassID, const char *Name, bool IsStatic, CSharpFunctionCallback Getter, int64_t GetterData, CSharpFunctionCallback Setter, int64_t SetterData);
+    bool RegisterProperty(int ClassID, const char *Name, bool IsStatic, CSharpFunctionCallback Getter, int64_t GetterData, CSharpFunctionCallback Setter, int64_t SetterData, bool DontDelete);
 
     bool RegisterIndexedProperty(int ClassID, CSharpIndexedGetterCallback Getter, CSharpIndexedSetterCallback Setter, int64_t Data);
 
@@ -121,7 +123,7 @@ public:
 
     void DestroyInspector();
 
-    void InspectorTick();
+    bool InspectorTick();
 
     v8::Isolate* MainIsolate;
 

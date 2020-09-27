@@ -49,6 +49,166 @@ namespace Puerts
             }
         }
 
+        bool FastArrayGet(IntPtr isolate, IntPtr info, IntPtr self, object obj, uint index)
+        {
+            bool hited = true;
+            var type = obj.GetType();
+
+            if (type == typeof(int[]))
+            {
+                int[] array = obj as int[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(float[]))
+            {
+                float[] array = obj as float[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(double[]))
+            {
+                double[] array = obj as double[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(bool[]))
+            {
+                bool[] array = obj as bool[];
+                PuertsDLL.ReturnBoolean(isolate, info, array[index]);
+            }
+            else if (type == typeof(long[]))
+            {
+                long[] array = obj as long[];
+                PuertsDLL.ReturnBigInt(isolate, info, array[index]);
+            }
+            else if (type == typeof(ulong[]))
+            {
+                ulong[] array = obj as ulong[];
+                PuertsDLL.ReturnBigInt(isolate, info, (long)array[index]);
+            }
+            else if (type == typeof(sbyte[]))
+            {
+                sbyte[] array = obj as sbyte[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(short[]))
+            {
+                short[] array = obj as short[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(ushort[]))
+            {
+                ushort[] array = obj as ushort[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(char[]))
+            {
+                char[] array = obj as char[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(uint[]))
+            {
+                uint[] array = obj as uint[];
+                PuertsDLL.ReturnNumber(isolate, info, array[index]);
+            }
+            else if (type == typeof(string[]))
+            {
+                string[] array = obj as string[];
+                string str = array[index];
+                if (str == null)
+                {
+                    PuertsDLL.ReturnNull(isolate, info);
+                }
+                else
+                {
+                    PuertsDLL.ReturnString(isolate, info, str);
+                }
+            }
+            else
+            {
+                hited = false;
+            }
+            return hited;
+        }
+        
+        bool FastArraySet(IntPtr isolate, IntPtr info, IntPtr self, object obj, uint index, IntPtr value)
+        {
+            bool hited = true;
+            var jsType = PuertsDLL.GetJsValueType(isolate, value, false);
+            var type = obj.GetType();
+
+            if (type == typeof(int[]) && jsType == JsValueType.Number)
+            {
+                int[] array = obj as int[];
+                array[index] = (int)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(float[]) && jsType == JsValueType.Number)
+            {
+                float[] array = obj as float[];
+                array[index] = (float)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(double[]) && jsType == JsValueType.Number)
+            {
+                double[] array = obj as double[];
+                array[index] = PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(bool[]) && jsType == JsValueType.Boolean)
+            {
+                bool[] array = obj as bool[];
+                array[index] = PuertsDLL.GetBooleanFromValue(isolate, value, false);
+            }
+            else if (type == typeof(long[]) && jsType == JsValueType.BigInt)
+            {
+                long[] array = obj as long[];
+                array[index] = PuertsDLL.GetBigIntFromValueChecked(isolate, value, false);
+            }
+            else if (type == typeof(ulong[]) && jsType == JsValueType.BigInt)
+            {
+                ulong[] array = obj as ulong[];
+                array[index] = (ulong)PuertsDLL.GetBigIntFromValueChecked(isolate, value, false);
+            }
+            else if (type == typeof(sbyte[]) && jsType == JsValueType.Number)
+            {
+                sbyte[] array = obj as sbyte[];
+                array[index] = (sbyte)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(short[]) && jsType == JsValueType.Number)
+            {
+                short[] array = obj as short[];
+                array[index] = (short)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(ushort[]) && jsType == JsValueType.Number)
+            {
+                ushort[] array = obj as ushort[];
+                array[index] = (ushort)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(char[]) && jsType == JsValueType.Number)
+            {
+                char[] array = obj as char[];
+                array[index] = (char)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(uint[]) && jsType == JsValueType.Number)
+            {
+                uint[] array = obj as uint[];
+                array[index] = (uint)PuertsDLL.GetNumberFromValue(isolate, value, false);
+            }
+            else if (type == typeof(string[]) && jsType == JsValueType.String)
+            {
+                string[] array = obj as string[];
+                array[index] = PuertsDLL.GetStringFromValue(isolate, value, false);
+            }
+            else if (type == typeof(string[]) && jsType == JsValueType.NullOrUndefined)
+            {
+                string[] array = obj as string[];
+                array[index] = null;
+            }
+            else
+            {
+                hited = false;
+            }
+            return hited;
+        }
+        
+        private int arrayTypeId = -1;
+
         internal void ArrayGet(IntPtr isolate, IntPtr info, IntPtr self, uint index)
         {
             try
@@ -78,11 +238,47 @@ namespace Puerts
             }
         }
 
-        private int arrayTypeId = -1;
         internal void InitArrayTypeId(IntPtr isolate)
         {
             arrayTypeId = PuertsDLL.RegisterClass(jsEnv.isolate, GetTypeId(isolate, typeof(Array)), "__puerts.Array", null, null, 0);
-            PuertsDLL.RegisterProperty(jsEnv.isolate, arrayTypeId, "length", false, callbackWrap, jsEnv.AddCallback(ArrayLength), null, 0);
+            var lengthFuncId = jsEnv.AddCallback(ArrayLength);
+            PuertsDLL.RegisterProperty(jsEnv.isolate, arrayTypeId, "Length", false, callbackWrap, lengthFuncId, null, 0, true);
+
+            PuertsDLL.RegisterFunction(jsEnv.isolate, arrayTypeId, "get_Item", false, callbackWrap, jsEnv.AddCallback((IntPtr isolate1, IntPtr info, IntPtr self, int argumentsLen)=>
+            {
+                try
+                {
+                    Array array = jsEnv.GeneralGetterManager.GetSelf(self) as Array;
+                    uint index = (uint)PuertsDLL.GetNumberFromValue(isolate1, PuertsDLL.GetArgumentValue(info, 0), false);
+                    if (FastArrayGet(isolate1, info, self, array, index)) return;
+                    var transalteFunc = jsEnv.GeneralSetterManager.GetTranslateFunc(array.GetType().GetElementType());
+                    transalteFunc(isolate1, NativeValueApi.SetValueToResult, info, array.GetValue((int)index));
+                }
+                catch (Exception e)
+                {
+                    PuertsDLL.ThrowException(isolate1, "array.get throw c# exception:" + e.Message + ",stack:" + e.StackTrace);
+                }
+            }));
+
+            PuertsDLL.RegisterFunction(jsEnv.isolate, arrayTypeId, "set_Item", false, callbackWrap, jsEnv.AddCallback((IntPtr isolate1, IntPtr info, IntPtr self, int argumentsLen) =>
+            {
+                try
+                {
+                    Array array = jsEnv.GeneralGetterManager.GetSelf(self) as Array;
+                    uint index = (uint)PuertsDLL.GetNumberFromValue(isolate1, PuertsDLL.GetArgumentValue(info, 0), false);
+                    var val = PuertsDLL.GetArgumentValue(info, 1);
+                    if (FastArraySet(isolate1, info, self, array, index, val)) return;
+                    var transalteFunc = jsEnv.GeneralGetterManager.GetTranslateFunc(array.GetType().GetElementType());
+                    array.SetValue(transalteFunc(isolate1, NativeValueApi.GetValueFromArgument, val, false), index);
+                }
+                catch (Exception e)
+                {
+                    PuertsDLL.ThrowException(isolate1, "array.get throw c# exception:" + e.Message + ",stack:" + e.StackTrace);
+                }
+            }));
+
+            //暂时兼容，否则生成代码的模版那里用不了
+            PuertsDLL.RegisterProperty(jsEnv.isolate, arrayTypeId, "length", false, callbackWrap, lengthFuncId, null, 0, true);
             PuertsDLL.RegisterIndexedProperty(jsEnv.isolate, arrayTypeId, StaticCallbacks.IndexedGetterWrap, StaticCallbacks.IndexedSetterWrap, Utils.TwoIntToLong(jsEnv.Idx, 0));
         }
 
@@ -176,6 +372,8 @@ namespace Puerts
         }
 
         private readonly V8FunctionCallback callbackWrap = new V8FunctionCallback(StaticCallbacks.JsEnvCallbackWrap);
+
+        private readonly V8FunctionCallback returnTrue = new V8FunctionCallback(StaticCallbacks.ReturnTrue);
 
         private readonly V8ConstructorCallback constructorWrap = new V8ConstructorCallback(StaticCallbacks.ConstructorWrap);
 
@@ -358,6 +556,18 @@ namespace Puerts
                 baseTypeId = GetTypeId(isolate, type.BaseType);
             }
 
+            var fields = type.GetFields(flag);
+
+            HashSet<string> readonlyStaticFields = new HashSet<string>();
+
+            foreach (var field in fields)
+            {
+                if (field.IsStatic && (field.IsInitOnly || field.IsLiteral))
+                {
+                    readonlyStaticFields.Add(field.Name);
+                }
+            }
+
             int typeId = -1;
             if (registerInfo == null)
             {
@@ -382,7 +592,7 @@ namespace Puerts
 
                 foreach (var kv in registerInfo.Properties)
                 {
-                    PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, kv.Key, kv.Value.IsStatic, kv.Value.Getter, jsEnv.Idx, kv.Value.Setter, jsEnv.Idx);
+                    PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, kv.Key, kv.Value.IsStatic, kv.Value.Getter, jsEnv.Idx, kv.Value.Setter, jsEnv.Idx, !readonlyStaticFields.Contains(kv.Key));
                 }
             }
             
@@ -419,10 +629,10 @@ namespace Puerts
                     setterData = jsEnv.AddCallback(methodReflectionWrap.Invoke);
                     isStatic = kv.Value.Setter.IsStatic;
                 }
-                PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, kv.Key, isStatic, getter, getterData, setter, setterData);
+                PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, kv.Key, isStatic, getter, getterData, setter, setterData, true);
             }
 
-            foreach(var field in type.GetFields(flag))
+            foreach(var field in fields)
             {
                 if (registerInfo != null && registerInfo.Properties.ContainsKey(field.Name))
                 {
@@ -439,14 +649,19 @@ namespace Puerts
                     setterData = jsEnv.AddCallback(GenFieldSetter(type, field));
                 }
 
-                PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, field.Name, field.IsStatic, callbackWrap, getterData, setter, setterData);
+                PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, field.Name, field.IsStatic, callbackWrap, getterData, setter, setterData, !readonlyStaticFields.Contains(field.Name));
             }
 
             var translateFunc = jsEnv.GeneralSetterManager.GetTranslateFunc(typeof(Type));
             PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, "__p_innerType", true, callbackWrap, jsEnv.AddCallback((IntPtr isolate1, IntPtr info, IntPtr self, int argumentsLen) =>
             {
                 translateFunc(isolate1, NativeValueApi.SetValueToResult, info, type);
-            }), null, 0);
+            }), null, 0, true);
+
+            if (type.IsEnum)
+            {
+                PuertsDLL.RegisterProperty(jsEnv.isolate, typeId, "__p_isEnum", true, returnTrue, 0, null, 0, false);
+            }
 
             return typeId;
         }
@@ -482,6 +697,11 @@ namespace Puerts
                 typeMap[typeId] = type;
             }
             return typeId;
+        }
+
+        public bool IsArray(int typeId)
+        {
+            return typeId == arrayTypeId;
         }
 
         public int GetTypeId(IntPtr isolate, Type type)

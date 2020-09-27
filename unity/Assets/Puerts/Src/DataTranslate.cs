@@ -1,4 +1,4 @@
-/*
+Ôªø/*
 * Tencent is pleased to support the open source community by making Puerts available.
 * Copyright (C) 2020 THL A29 Limited, a Tencent company.  All rights reserved.
 * Puerts is licensed under the BSD 3-Clause License, except for the third-party components listed in the file 'LICENSE' which may be subject to their corresponding license terms. 
@@ -10,7 +10,7 @@ using System.Collections.Generic;
 
 namespace Puerts
 {
-    //target≤Œjs∂‘œÛæ≤ƒ¨◊™ªªµΩc#∂‘œÛ ±”–”√
+    //targetÂèÇjsÂØπË±°ÈùôÈªòËΩ¨Êç¢Âà∞c#ÂØπË±°Êó∂ÊúâÁî®
     public delegate object GeneralGetter(IntPtr isolate, IGetValueFromJs getValueApi, IntPtr value, bool isByRef);
 
     public class GeneralGetterManager
@@ -18,6 +18,8 @@ namespace Puerts
         private ObjectPool objectPool;
 
         private TypeRegister typeRegister;
+
+        private readonly JsEnv jsEnv;
 
         private Dictionary<Type, GeneralGetter> generalGetterMap = new Dictionary<Type, GeneralGetter>();
 
@@ -27,6 +29,7 @@ namespace Puerts
 
         internal GeneralGetterManager(JsEnv jsEnv)
         {
+            this.jsEnv = jsEnv;
             objectPool = jsEnv.objectPool;
             typeRegister = jsEnv.TypeRegister;
             genericDelegateFactory = new GenericDelegateFactory(jsEnv);
@@ -46,6 +49,8 @@ namespace Puerts
             generalGetterMap[typeof(bool)] = BooleanTranslator;
             generalGetterMap[typeof(string)] = StringTranslator;
             generalGetterMap[typeof(DateTime)] = DateTranslator;
+            generalGetterMap[typeof(ArrayBuffer)] = ArrayBufferTranslator;
+            generalGetterMap[typeof(GenericDelegate)] = GenericDelegateTranslator;
             generalGetterMap[typeof(object)] = AnyTranslator;
             //special type
             //translatorMap[typeof(LuaTable)] = getLuaTable;
@@ -124,6 +129,25 @@ namespace Puerts
             return (new DateTime(1970, 1, 1)).AddMilliseconds(ticks);
         }
 
+        private static object ArrayBufferTranslator(IntPtr isolate, IGetValueFromJs getValueApi, IntPtr value, bool isByRef)
+        {
+            return getValueApi.GetArrayBuffer(isolate, value, isByRef);
+        }
+
+        private object GenericDelegateTranslator(IntPtr isolate, IGetValueFromJs getValueApi, IntPtr value, bool isByRef)
+        {
+            var jsValueType = getValueApi.GetJsValueType(isolate, value, isByRef);
+            if (jsValueType == JsValueType.Function)
+            {
+                var nativePtr = getValueApi.GetFunction(isolate, value, isByRef);
+                return new GenericDelegate(nativePtr, jsEnv);
+            }
+            else
+            {
+                return AnyTranslator(isolate, getValueApi, value, isByRef);
+            }
+        }
+
         internal object AnyTranslator(IntPtr isolate, IGetValueFromJs getValueApi, IntPtr value, bool isByRef)
         {
             var type = getValueApi.GetJsValueType(isolate, value, isByRef);
@@ -135,14 +159,19 @@ namespace Puerts
                     return getValueApi.GetBoolean(isolate, value, isByRef);
                 case JsValueType.Date:
                     return DateTranslator(isolate, getValueApi, value, isByRef);
+                case JsValueType.ArrayBuffer:
+                    return getValueApi.GetArrayBuffer(isolate, value, isByRef);
                 //case JsValueType.Function:
                 //case JsValueType.JsObject:
                 case JsValueType.NativeObject:
                     var typeId = getValueApi.GetTypeId(isolate, value, isByRef);
-                    var objType = typeRegister.GetType(typeId);
-                    if (objType != typeof(object) && generalGetterMap.ContainsKey(objType))
+                    if (!typeRegister.IsArray(typeId))
                     {
-                        return generalGetterMap[objType](isolate, getValueApi, value, isByRef);
+                        var objType = typeRegister.GetType(typeId);
+                        if (objType != typeof(object) && generalGetterMap.ContainsKey(objType))
+                        {
+                            return generalGetterMap[objType](isolate, getValueApi, value, isByRef);
+                        }
                     }
                     var objPtr = getValueApi.GetObject(isolate, value, isByRef);
                     return objectPool.Get(objPtr.ToInt32());
@@ -270,7 +299,7 @@ namespace Puerts
             { typeof(double), JsValueType.Number },
             { typeof(char), JsValueType.Number },
             { typeof(float), JsValueType.Number },
-            //{ typeof(decimal), JsValueType.Number }, TODO: ∞—decimal by value ¥´µ›µΩjs
+            //{ typeof(decimal), JsValueType.Number }, TODO: Êäädecimal by value ‰º†ÈÄíÂà∞js
             { typeof(bool), JsValueType.Boolean },
             { typeof(string), JsValueType.String | JsValueType.NullOrUndefined },
             { typeof(object), JsValueType.Any}
@@ -301,11 +330,19 @@ namespace Puerts
             }
             else if (type.IsArray)
             {
-                mash = JsValueType.Array;
+                mash = JsValueType.NativeObject | JsValueType.NullOrUndefined;
             }
             else if (type == typeof(DateTime))
             {
                 mash = JsValueType.Date;
+            }
+            else if (type == typeof(ArrayBuffer))
+            {
+                mash = JsValueType.ArrayBuffer;
+            }
+            else if (type == typeof(GenericDelegate))
+            {
+                mash = JsValueType.Function | JsValueType.NativeObject | JsValueType.NullOrUndefined;
             }
             else if (!type.IsAbstract() && typeof(Delegate).IsAssignableFrom(type))
             {
@@ -313,7 +350,7 @@ namespace Puerts
             }
             else if (type.IsValueType())
             {
-                mash = JsValueType.NativeObject/* | JsValueType.JsObject*/; //TODO: ÷ß≥÷js∂‘œÛµΩC#∂‘œÛæ≤ƒ¨◊™ªª
+                mash = JsValueType.NativeObject/* | JsValueType.JsObject*/; //TODO: ÊîØÊåÅjsÂØπË±°Âà∞C#ÂØπË±°ÈùôÈªòËΩ¨Êç¢
             }
             else
             {
@@ -358,6 +395,7 @@ namespace Puerts
             generalSetterMap[typeof(bool)] = BooleanTranslator;
             generalSetterMap[typeof(string)] = StringTranslator;
             generalSetterMap[typeof(DateTime)] = DateTranslator;
+            generalSetterMap[typeof(ArrayBuffer)] = ArrayBufferTranslator;
             generalSetterMap[typeof(void)] = VoidTranslator;
             generalSetterMap[typeof(object)] = AnyTranslator;
         }
@@ -442,6 +480,11 @@ namespace Puerts
         {
             DateTime date = (DateTime)obj;
             setValueApi.SetDate(isolate, holder, (date - new DateTime(1970, 1, 1)).TotalMilliseconds);
+        }
+
+        private static void ArrayBufferTranslator(IntPtr isolate, ISetValueToJs setValueApi, IntPtr holder, object obj)
+        {
+            setValueApi.SetArrayBuffer(isolate, holder, (ArrayBuffer)obj);
         }
 
         internal void AnyTranslator(IntPtr isolate, ISetValueToJs setValueApi, IntPtr holder, object obj)

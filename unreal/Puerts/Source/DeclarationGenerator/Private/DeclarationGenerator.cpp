@@ -187,7 +187,7 @@ void FTypeScriptDeclarationGenerator::Gen(UObject *ToGen)
     }
     Processed.Add(ToGen);
     ProcessedByName.Add(SafeName(ToGen->GetName()));
-    
+
     if (auto Class = Cast<UClass>(ToGen))
     {
         GenClass(Class);
@@ -275,7 +275,10 @@ bool FTypeScriptDeclarationGenerator::GenTypeDecl(FStringBuffer& StringBuffer, P
     }
     else if (auto StructProperty = CastFieldMacro<StructPropertyMacro>(Property))
     {
-        AddToGen.Add(StructProperty->Struct);
+        if (StructProperty->Struct->GetName() != "ArrayBuffer")
+        {
+            AddToGen.Add(StructProperty->Struct);
+        }
         StringBuffer << SafeName(StructProperty->Struct->GetName());
     }
     else if (auto ArrayProperty = CastFieldMacro<ArrayPropertyMacro>(Property))
@@ -363,7 +366,7 @@ bool FTypeScriptDeclarationGenerator::GenFunction(FStringBuffer& OwnerBuffer,UFu
         {
             OwnerBuffer << "static ";
         }
-        
+
         OwnerBuffer << SafeName(Function->GetName());
     }
     OwnerBuffer << "(";
@@ -413,12 +416,12 @@ bool FTypeScriptDeclarationGenerator::GenFunction(FStringBuffer& OwnerBuffer,UFu
     {
         return false;
     }
-    
+
     for (auto Type : RefTypes)
     {
         Gen(Type);
     }
-    
+
     //OwnerBuffer << "    " << LocalBuffer.Buffer << ";\n";
     return true;
 }
@@ -427,15 +430,15 @@ void FTypeScriptDeclarationGenerator::GenClass(UClass* Class)
 {
     FStringBuffer StringBuffer {"", ""};
     StringBuffer << "class " << SafeName(Class->GetName());
-    
+
     auto Super = Class->GetSuperStruct();
-    
+
     if (Super)
     {
         Gen(Super);
         StringBuffer << " extends " << SafeName(Super->GetName());
     }
-    
+
     StringBuffer << " {\n";
 
     StringBuffer << "    constructor(Outer?: Object, Name?: string, ObjectFlags?: number);\n";
@@ -457,7 +460,7 @@ void FTypeScriptDeclarationGenerator::GenClass(UClass* Class)
         }
         StringBuffer << "    " << TmpBuff.Buffer << ";\n";
     }
-    
+
     for (TFieldIterator<UFunction> FunctionIt(Class, EFieldIteratorFlags::ExcludeSuper); FunctionIt; ++FunctionIt)
     {
         FStringBuffer TmpBuff;
@@ -483,13 +486,13 @@ void FTypeScriptDeclarationGenerator::GenClass(UClass* Class)
             StringBuffer << "    " << TmpBuff.Buffer << ";\n";
         }
     }
-    
+
     StringBuffer << "    static StaticClass(): Class;\n";
     StringBuffer << "    static Find(OrigInName: string, Outer?: Object): " << SafeName(Class->GetName()) << ";\n";
     StringBuffer << "    static Load(InName: string): " << SafeName(Class->GetName()) << ";\n";
-    
+
     StringBuffer << "}\n\n";
-    
+
     Output << StringBuffer;
 }
 
@@ -504,9 +507,9 @@ void FTypeScriptDeclarationGenerator::GenEnum(UEnum *Enum)
        // auto Value = Enum->GetValueByIndex(i);
         EnumListerrals.Add(Name);
     }
-    
+
     StringBuffer << "enum " << SafeName(Enum->GetName()) << " { " << FString::Join(EnumListerrals, TEXT(", ")) << "}\n";
-    
+
     Output << StringBuffer;
 }
 
@@ -515,15 +518,15 @@ void FTypeScriptDeclarationGenerator::GenStruct(UStruct *Struct)
 #include "ExcludeStructs.h"
     FStringBuffer StringBuffer {"", ""};
     StringBuffer << "class " << SafeName(Struct->GetName());
-    
+
     auto Super = Struct->GetSuperStruct();
-    
+
     if (Super)
     {
         Gen(Super);
         StringBuffer << " extends " << SafeName(Super->GetName());
     }
-    
+
     StringBuffer << " {\n";
 
     auto GenConstrutor = [&]()
@@ -553,7 +556,7 @@ void FTypeScriptDeclarationGenerator::GenStruct(UStruct *Struct)
         StringBuffer << "    " << TmpBuff.Buffer << ";\n";
     };
     GenConstrutor();
-    
+
     for (TFieldIterator<PropertyMacro> PropertyIt(Struct, EFieldIteratorFlags::ExcludeSuper); PropertyIt; ++PropertyIt)
     {
         auto Property = *PropertyIt;
@@ -587,9 +590,9 @@ void FTypeScriptDeclarationGenerator::GenStruct(UStruct *Struct)
             StringBuffer << "    " << TmpBuff.Buffer << ";\n";
         }
     }
-    
+
     StringBuffer << "}\n\n";
-    
+
     Output << StringBuffer;
 }
 
@@ -613,7 +616,7 @@ void FReactDeclarationGenerator::GenReactDeclaration()
 {
     FString Components = TEXT("exports.lazyloadComponents = {};\n");
     Output << "import * as React from 'react';\nimport {TArray}  from 'ue';\n\n";
-    
+
     for (TObjectIterator<UClass> It; It; ++It)
     {
         UClass* Class = *It;
@@ -627,7 +630,7 @@ void FReactDeclarationGenerator::GenReactDeclaration()
     for (TObjectIterator<UClass> It; It; ++It)
     {
         UClass* Class = *It;
-        if (Class->IsChildOf<UWidget>()) 
+        if (Class->IsChildOf<UWidget>())
         {
             Gen(Class);
             Components += "exports." + SafeName(Class->GetName()) + " = '" + SafeName(Class->GetName()) + "';\n";
@@ -656,9 +659,13 @@ export var ReactUMG : TReactUMG;
     FFileHelper::SaveStringToFile(Components, *(FPaths::ProjectContentDir() / TEXT("TsScripts/dist/react-umg/components.js")));
 }
 
-static bool IsReactSupportProperty(PropertyMacro *Property) 
+static bool IsReactSupportProperty(PropertyMacro *Property)
 {
-    if (CastFieldMacro<ObjectPropertyMacro>(Property) || CastFieldMacro<ClassPropertyMacro>(Property)) return false;
+    if (CastFieldMacro<ObjectPropertyMacro>(Property)
+        || CastFieldMacro<ClassPropertyMacro>(Property)
+        || CastFieldMacro<WeakObjectPropertyMacro>(Property)
+        || CastFieldMacro<SoftObjectPropertyMacro>(Property)
+        || CastFieldMacro<LazyObjectPropertyMacro>(Property)) return false;
     if (auto ArrayProperty = CastFieldMacro<ArrayPropertyMacro>(Property))
     {
         return IsReactSupportProperty(ArrayProperty->Inner);
@@ -814,7 +821,7 @@ private:
     {
         LoadAllWidgetBlueprint();
         GenTypeScriptDeclaration();
-        //GenReactDeclaration();
+        GenReactDeclaration();
         FText DialogText = FText::Format(
             LOCTEXT("PluginButtonDialogText", "genertate finish, {0} store in {1}"),
             FText::FromString(TEXT("ue.d.ts")),
@@ -824,7 +831,7 @@ private:
     }
 
 public:
-    void StartupModule() override 
+    void StartupModule() override
     {
         //IModularFeatures::Get().RegisterModularFeature(TEXT("ScriptGenerator"), this);
         FGenDTSStyle::Initialize();
@@ -849,7 +856,7 @@ public:
         }
     }
 
-    void ShutdownModule() override 
+    void ShutdownModule() override
     {
         //IModularFeatures::Get().UnregisterModularFeature(TEXT("ScriptGenerator"), this);
         FGenDTSStyle::Shutdown();
@@ -900,28 +907,28 @@ public:
         FReactDeclarationGenerator ReactDeclarationGenerator;
         ReactDeclarationGenerator.GenReactDeclaration();
     }
-    
+
 	/*
     virtual FString GetGeneratedCodeModuleName() const override
     {
         return TEXT("Engine");
     }
-    
+
     virtual bool SupportsTarget(const FString& TargetName) const override
     {
         return true;
     }
-    
+
     virtual bool ShouldExportClassesForModule(const FString& ModuleName, EBuildModuleType::Type ModuleType, const FString& ModuleGeneratedIncludeDirectory) const override
     {
         return ModuleName != TEXT("JsEnv");
     }
-    
+
     virtual void Initialize(const FString& RootLocalPath, const FString& RootBuildPath, const FString& OutputDirectory, const FString& IncludeBase) override
     {
         TypeScriptDeclarationGenerator.Begin();
     }
-    
+
     virtual void ExportClass(class UClass* Class, const FString& SourceHeaderFilename, const FString& GeneratedHeaderFilename, bool bHasChanged) override
     {
 #if WITH_EDITOR || HACK_HEADER_GENERATOR
@@ -932,7 +939,7 @@ public:
             TypeScriptDeclarationGenerator.Gen(Class);
         }
     }
-    
+
     virtual void FinishExport() override
     {
         TypeScriptDeclarationGenerator.End();
@@ -941,7 +948,7 @@ public:
         //printf(">>>>>>>>>>>>save to %s\n\n", TCHAR_TO_ANSI(*Path));
         FFileHelper::SaveStringToFile(TypeScriptDeclarationGenerator.ToString(), *Path);
     }
-    
+
     virtual FString GetGeneratorName() const override
     {
         return TEXT("(TypeScript | Kotlin)Declaration Generator Plugin");

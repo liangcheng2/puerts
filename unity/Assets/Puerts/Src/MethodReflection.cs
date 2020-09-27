@@ -58,6 +58,8 @@ namespace Puerts
 
         private JsValueType[] typeMasks = null;
 
+        private int beginOptional = 0;
+        
         private Type[] types = null;
 
         private object[] args = null;
@@ -81,7 +83,7 @@ namespace Puerts
             byRefValueSetFuncs = new GeneralSetter[parameterInfos.Length];
             byRef = new bool[parameterInfos.Length];
             isOut = new bool[parameterInfos.Length];
-
+            beginOptional = this.length + 1;
             for (int i = 0; i < parameterInfos.Length; i++)
             {
                 var parameterInfo = parameterInfos[i];
@@ -91,7 +93,7 @@ namespace Puerts
                     parameterType = parameterType.GetElementType();
                     hasParamArray = true;
                 }
-                types[i] = parameterType;
+                types[i] = parameterType.IsByRef ? parameterType.GetElementType() : parameterType;
                 typeMasks[i] = GeneralGetterManager.GetJsTypeMask(parameterType);
                 argsTranslateFuncs[i] = generalGetterManager.GetTranslateFunc(parameterType);
                 byRef[i] = parameterType.IsByRef;
@@ -100,10 +102,14 @@ namespace Puerts
                     byRefValueSetFuncs[i] = generalSetterManager.GetTranslateFunc(parameterType.GetElementType());
                 }
                 isOut[i] = parameterType.IsByRef && parameterInfo.IsOut && !parameterInfo.IsIn;
+                if (i < beginOptional && parameterInfo.IsOptional)
+                {
+                    beginOptional = i;
+                }
             }
         }
 
-        public bool IsMatch(CallInfo callInfo)//TODO: 先不支持默认值
+        public bool IsMatch(CallInfo callInfo)
         {
             if (hasParamArray)
             {
@@ -112,7 +118,11 @@ namespace Puerts
                     return false;
                 }
             }
-            else if (callInfo.Length != length)
+            else if (callInfo.Length > length)
+            {
+                return false;
+            }
+            else if (callInfo.Length < beginOptional - 1)
             {
                 return false;
             }
@@ -143,7 +153,7 @@ namespace Puerts
                     {
                         if (callInfo.Values[i] == null)
                         {
-                            callInfo.Values[i] = generalGetterManager.AnyTranslator(callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[i], false);
+                            callInfo.Values[i] = generalGetterManager.AnyTranslator(callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[i], byRef[i]);
                         }
                         if (!types[i].IsAssignableFrom(callInfo.Values[i].GetType()))
                         {
@@ -169,6 +179,10 @@ namespace Puerts
                         paramArray.SetValue(translateFunc(callInfo.Isolate, NativeValueApi.GetValueFromArgument, callInfo.NativePtrs[j], false), j - i); 
                     }
                     args[i] = paramArray;
+                }
+				else if (i >= callInfo.Length && i >= beginOptional)
+                {
+                    args[i] = Type.Missing;
                 }
                 else
                 {
@@ -279,15 +293,23 @@ namespace Puerts
         {
             if (argumentsLen == 1)
             {
-                var arg0 = PuertsDLL.GetArgumentValue(info, 0);
-                var arg0type = NativeValueApi.GetValueFromArgument.GetJsValueType(isolate, arg0, false);
-                if (arg0type == JsValueType.Function || arg0type == JsValueType.NativeObject )
+                try
                 {
-                    object obj = translateFunc(isolate, NativeValueApi.GetValueFromArgument, arg0, false);
-                    if (obj != null)
+                    var arg0 = PuertsDLL.GetArgumentValue(info, 0);
+                    var arg0type = NativeValueApi.GetValueFromArgument.GetJsValueType(isolate, arg0, false);
+                    if (arg0type == JsValueType.Function || arg0type == JsValueType.NativeObject)
                     {
-                        return obj;
+                        object obj = translateFunc(isolate, NativeValueApi.GetValueFromArgument, arg0, false);
+                        if (obj != null)
+                        {
+                            return obj;
+                        }
                     }
+                }
+                catch(Exception e)
+                {
+                    PuertsDLL.ThrowException(isolate, "c# exception:" + e.Message + ",stack:" + e.StackTrace);
+                    return null;
                 }
             }
             PuertsDLL.ThrowException(isolate, "invalid arguments to constructor of " + delegateType.GetFriendlyName());

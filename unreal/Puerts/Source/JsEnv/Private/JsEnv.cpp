@@ -15,7 +15,6 @@
 #include "V8Utils.h"
 #include "Engine/Engine.h"
 #include "ObjectMapper.h"
-#include "ExtensionMethods.h"
 #include "JSLogger.h"
 #include "TickerDelegateWrapper.h"
 #include "JitScript.h"
@@ -37,11 +36,19 @@
 #include "Blob/Win64/NativesBlob.h"
 #include "Blob/Win64/SnapshotBlob.h"
 #elif PLATFORM_ANDROID_ARM
-#include "Blob/Android/armv7a/NativesBlob.h"
-#include "Blob/Android/armv7a/SnapshotBlob.h"
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION == 25
+#include "Blob/Android/armv7a/8.4.371.19/SnapshotBlob.h"
+#elif ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION < 25
+#include "Blob/Android/armv7a/7.4.288/NativesBlob.h"
+#include "Blob/Android/armv7a/7.4.288/SnapshotBlob.h"
+#endif
 #elif PLATFORM_ANDROID_ARM64
-#include "Blob/Android/arm64/NativesBlob.h"
-#include "Blob/Android/arm64/SnapshotBlob.h"
+#if ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION == 25
+#include "Blob/Android/arm64/8.4.371.19/SnapshotBlob.h"
+#elif ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION < 25
+#include "Blob/Android/arm64/7.4.288/NativesBlob.h"
+#include "Blob/Android/arm64/7.4.288/SnapshotBlob.h"
+#endif
 #elif PLATFORM_MAC
 #include "Blob/macOS/NativesBlob.h"
 #include "Blob/macOS/SnapshotBlob.h"
@@ -289,10 +296,6 @@ private:
 
     v8::Global<v8::Context> DefaultContext;
 
-    std::unique_ptr<v8::StartupData> NativesBlob;
-
-    std::unique_ptr<v8::StartupData> SnapshotBlob;
-
     std::map<UStruct*, v8::UniquePersistent<v8::FunctionTemplate>> ClassToTemplateMap;
 
     std::map<const void*, v8::UniquePersistent<v8::FunctionTemplate>> CDataNameToTemplateMap;
@@ -443,21 +446,26 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
 
     ModuleLoader = std::move(InModuleLoader);
     Logger = InLogger;
+#if !PLATFORM_ANDROID || \
+    (PLATFORM_ANDROID && ENGINE_MAJOR_VERSION == 4 && ENGINE_MINOR_VERSION < 25)
+    std::unique_ptr<v8::StartupData> NativesBlob;
     if (!NativesBlob)
     {
         NativesBlob = std::make_unique<v8::StartupData>();
         NativesBlob->data = (const char *)NativesBlobCode;
         NativesBlob->raw_size = sizeof(NativesBlobCode);
     }
+    v8::V8::SetNativesDataBlob(NativesBlob.get());
+#endif
+    std::unique_ptr<v8::StartupData> SnapshotBlob;
     if (!SnapshotBlob)
     {
-        SnapshotBlob = std::make_unique<v8::StartupData>();//TODO: 直接用局部变量就可以了吧？
+        SnapshotBlob = std::make_unique<v8::StartupData>();
         SnapshotBlob->data = (const char *)SnapshotBlobCode;
         SnapshotBlob->raw_size = sizeof(SnapshotBlobCode);
     }
 
     // 初始化Isolate和DefaultContext
-    v8::V8::SetNativesDataBlob(NativesBlob.get());
     v8::V8::SetSnapshotDataBlob(SnapshotBlob.get());
 
     CreateParams.array_buffer_allocator = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -594,7 +602,7 @@ FJsEnvImpl::FJsEnvImpl(std::unique_ptr<IJSModuleLoader> InModuleLoader, std::sha
     auto LocalTemplate = v8::FunctionTemplate::New(Isolate, PointerNew);
     LocalTemplate->InstanceTemplate()->SetInternalFieldCount(4);//0 Ptr, 1, CDataName
     PointerConstrutor = v8::UniquePersistent<v8::Function>(Isolate, LocalTemplate->GetFunction(Context).ToLocalChecked());
-
+    
     DelegateTemplate = v8::UniquePersistent<v8::FunctionTemplate>(Isolate, FDelegateWrapper::ToFunctionTemplate(Isolate));
 
     MulticastDelegateTemplate = v8::UniquePersistent<v8::FunctionTemplate>(Isolate, FMulticastDelegateWrapper::ToFunctionTemplate(Isolate));
@@ -965,6 +973,13 @@ v8::Local<v8::Value> FJsEnvImpl::FindOrAdd(v8::Isolate* Isolate, v8::Local<v8::C
 v8::Local<v8::Value> FJsEnvImpl::FindOrAddStruct(v8::Isolate* Isolate, v8::Local<v8::Context>& Context, UScriptStruct* ScriptStruct, void *Ptr, bool PassByPointer)
 {
     check(Ptr);//must not null
+
+    if (ScriptStruct == FArrayBuffer::StaticStruct())
+    {
+        FArrayBuffer * ArrayBuffer = static_cast<FArrayBuffer *>(Ptr);
+        v8::Local<v8::ArrayBuffer> Ab = v8::ArrayBuffer::New(Isolate, ArrayBuffer->Data, ArrayBuffer->Length);
+        return Ab;
+    }
 
     if (!PassByPointer)
     {

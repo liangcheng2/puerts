@@ -15,7 +15,7 @@ namespace Puerts
         private readonly IntPtr isolate;
         private readonly IntPtr value;
         private readonly JsValueType valueType;
-        private Type csType;
+        private object obj;
 
         public ArgumentHelper(int jsEnvIdx, IntPtr isolate, IntPtr info, int index)
         {
@@ -23,7 +23,7 @@ namespace Puerts
             this.isolate = isolate;
             value = PuertsDLL.GetArgumentValue(info, index);
             valueType = PuertsDLL.GetJsValueType(isolate, value, false);
-            csType = null;
+            obj = null;
         }
 
         public bool IsMatch(JsValueType expectJsType, Type expectCsType, bool isByRef, bool isOut)
@@ -41,15 +41,12 @@ namespace Puerts
             }
             if (jsType == JsValueType.NativeObject)
             {
-                if (csType == null)
+                if (obj == null)
                 {
-                    var typeId = NativeValueApi.GetValueFromArgument.GetTypeId(isolate, value, isByRef);
-                    if (typeId >= 0)
-                    {
-                        csType = JsEnv.jsEnvs[jsEnvIdx].TypeRegister.GetType(typeId);
-                    }
+                    obj = JsEnv.jsEnvs[jsEnvIdx].GeneralGetterManager.AnyTranslator(isolate, NativeValueApi.GetValueFromArgument, value, isByRef);
                 }
-                return csType != null && expectCsType != null && expectCsType.IsAssignableFrom(csType);
+
+                return expectCsType != null && expectCsType.IsAssignableFrom(obj.GetType());
             }
             return true;
         }
@@ -126,7 +123,7 @@ namespace Puerts
 
         public long GetInt64(bool isByRef)
         {
-            return PuertsDLL.GetBigIntFromValue(isolate, value, isByRef);
+            return PuertsDLL.GetBigIntFromValueChecked(isolate, value, isByRef);
         }
 
         public void SetByRefValue(long val)
@@ -136,7 +133,7 @@ namespace Puerts
 
         public ulong GetUInt64(bool isByRef)
         {
-            return (ulong)PuertsDLL.GetBigIntFromValue(isolate, value, isByRef);
+            return (ulong)PuertsDLL.GetBigIntFromValueChecked(isolate, value, isByRef);
         }
 
         public void SetByRefValue(ulong val)
@@ -197,6 +194,7 @@ namespace Puerts
 
         public T Get<T>(bool isByRef)
         {
+            if (obj != null) return (T)obj;
             return StaticTranslate<T>.Get(jsEnvIdx, isolate, NativeValueApi.GetValueFromArgument, value, isByRef);
         }
 
